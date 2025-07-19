@@ -26,7 +26,6 @@ def get_formats():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             for f in info.get("formats", []):
-                # Identificar o tipo
                 has_video = f.get("vcodec") != "none"
                 has_audio = f.get("acodec") != "none"
                 tipo = "[Vídeo + Áudio]" if has_video and has_audio else "[Vídeo]" if has_video else "[Áudio]"
@@ -43,14 +42,11 @@ def get_formats():
                     "filesize": f.get("filesize") or 0
                 })
 
-        # Eliminar duplicados com base na label
         formats = sorted({f['label']: f for f in formats}.values(), key=lambda x: x['label'], reverse=True)
         return jsonify({"formats": formats})
     except Exception as e:
         print("ERRO AO CARREGAR FORMATS:", e)
         return jsonify({"error": str(e)}), 500
-
-
 
 @app.route("/download", methods=["POST"])
 def download():
@@ -74,4 +70,6 @@ def download():
         return f"Erro: {e}", 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
