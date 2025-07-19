@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file, jsonify
+from flask import Flask, render_template, request, send_file, jsonify, after_this_request
 import yt_dlp
 import os
 import uuid
@@ -28,7 +28,7 @@ VUUJL3R2CVRSVUUJMTc4NTcyNTQyMQlfX1NlY3VyZS1ZVF9ERVJQCUNLQ3g1
 SlUt
 """
 
-# Decodifica e escreve os cookies para um ficheiro temporário (só uma vez no arranque)
+# Decodifica e escreve os cookies para um ficheiro temporário (uma vez no arranque)
 cookies_bytes = base64.b64decode(COOKIES_BASE64.encode('utf-8'))
 temp_cookies_file = tempfile.NamedTemporaryFile(delete=False, mode='wb', suffix='.txt')
 temp_cookies_file.write(cookies_bytes)
@@ -44,13 +44,17 @@ def index():
 
 @app.route("/get_formats", methods=["POST"])
 def get_formats():
-    url = request.form["url"]
+    url = request.form.get("url")
+    if not url:
+        return jsonify({"error": "URL em falta."}), 400
 
     ydl_opts = {
         "quiet": True,
         "skip_download": True,
         "cookiefile": COOKIES_FILE,
-        "nocheckcertificate": True,  # Ajuda a evitar problemas SSL
+        "nocheckcertificate": True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                      '(KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
     }
 
     try:
@@ -80,7 +84,22 @@ def get_formats():
             unique_formats[f['label']] = f
         formats = list(unique_formats.values())
 
-        formats.sort(key=lambda x: x['label'], reverse=True)
+        # Ordenar por qualidade (tentativa): vídeo + áudio > vídeo > áudio, depois por resolução/bitrate desc
+        def sort_key(f):
+            label = f['label']
+            if "[Vídeo + Áudio]" in label:
+                base = 3
+            elif "[Vídeo]" in label:
+                base = 2
+            else:
+                base = 1
+            # Extrair número de qualidade (altura ou bitrate) para ordenar
+            import re
+            nums = re.findall(r'\d+', label)
+            quality = int(nums[0]) if nums else 0
+            return (base, quality)
+
+        formats.sort(key=sort_key, reverse=True)
 
         return jsonify({"formats": formats})
 
@@ -97,8 +116,11 @@ def get_formats():
 
 @app.route("/download", methods=["POST"])
 def download():
-    url = request.form["url"]
-    format_id = request.form["format_id"]
+    url = request.form.get("url")
+    format_id = request.form.get("format_id")
+
+    if not url or not format_id:
+        return jsonify({"error": "URL ou format_id em falta."}), 400
 
     video_id = str(uuid.uuid4())
     output_path = os.path.join(DOWNLOAD_FOLDER, f"{video_id}.mp4")
@@ -109,11 +131,22 @@ def download():
         "outtmpl": output_path,
         "cookiefile": COOKIES_FILE,
         "nocheckcertificate": True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                      '(KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
+
+        @after_this_request
+        def remove_file(response):
+            try:
+                os.remove(output_path)
+            except Exception as e:
+                print(f"Erro a apagar ficheiro: {e}")
+            return response
+
         return send_file(output_path, as_attachment=True)
 
     except Exception as e:
