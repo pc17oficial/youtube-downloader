@@ -1,13 +1,13 @@
+import base64
+import os
+import tempfile
+import uuid
 from flask import Flask, render_template, request, send_file, jsonify, after_this_request
 import yt_dlp
-import os
-import uuid
-import base64
-import tempfile
 
 app = Flask(__name__)
 
-# Base64 dos cookies.txt (mantém exatamente como tens, sem alterações)
+# Conteúdo base64 dos cookies - usa exatamente o teu conteúdo.
 COOKIES_BASE64 = """
 IyBOZXRzY2FwZSBIVFRQIENvb2tpZSBGaWxlCiMgVGhpcyBmaWxlIGlzIGdl
 bmVyYXRlZCBieSB5dC1kbHAuICBEbyBub3QgZWRpdC4KCnlvdXR1YmUuY29t
@@ -28,12 +28,15 @@ VUUJL3R2CVRSVUUJMTc4NTcyNTQyMQlfX1NlY3VyZS1ZVF9ERVJQCUNLQ3g1
 SlUt
 """
 
-# Decodifica e escreve os cookies para um ficheiro temporário (uma vez no arranque)
-cookies_bytes = base64.b64decode(COOKIES_BASE64.encode('utf-8'))
-temp_cookies_file = tempfile.NamedTemporaryFile(delete=False, mode='wb', suffix='.txt')
-temp_cookies_file.write(cookies_bytes)
-temp_cookies_file.close()
-COOKIES_FILE = temp_cookies_file.name  # Caminho temporário do ficheiro de cookies
+# Decodificar e gravar cookies num ficheiro temporário
+def write_cookies_file():
+    decoded = base64.b64decode(COOKIES_BASE64.encode('utf-8'))
+    tf = tempfile.NamedTemporaryFile(delete=False, mode='wb', suffix='.txt')
+    tf.write(decoded)
+    tf.close()
+    return tf.name
+
+COOKIES_FILE = write_cookies_file()
 
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -65,36 +68,23 @@ def get_formats():
                 has_video = f.get("vcodec") != "none"
                 has_audio = f.get("acodec") != "none"
                 tipo = "[Vídeo + Áudio]" if has_video and has_audio else "[Vídeo]" if has_video else "[Áudio]"
-
                 resolution = f.get("format_note") or (str(f.get("height")) + "p" if f.get("height") else "?")
-                if has_video:
-                    label = f"{tipo} - {resolution}"
-                else:
-                    label = f"{tipo} - {f.get('abr', '?')}kbps"
-
+                label = f"{tipo} - {resolution}" if has_video else f"{tipo} - {f.get('abr', '?')}kbps"
                 formats.append({
                     "format_id": f["format_id"],
                     "label": label,
                     "filesize": f.get("filesize") or 0
                 })
 
-        # Remove duplicados pela label
-        unique_formats = {}
-        for f in formats:
-            unique_formats[f['label']] = f
+        # Remover duplicados pela label
+        unique_formats = {f['label']: f for f in formats}
         formats = list(unique_formats.values())
 
-        # Ordenar por qualidade (tentativa): vídeo + áudio > vídeo > áudio, depois por resolução/bitrate desc
+        # Ordenar por qualidade
+        import re
         def sort_key(f):
             label = f['label']
-            if "[Vídeo + Áudio]" in label:
-                base = 3
-            elif "[Vídeo]" in label:
-                base = 2
-            else:
-                base = 1
-            # Extrair número de qualidade (altura ou bitrate) para ordenar
-            import re
+            base = 3 if "[Vídeo + Áudio]" in label else 2 if "[Vídeo]" in label else 1
             nums = re.findall(r'\d+', label)
             quality = int(nums[0]) if nums else 0
             return (base, quality)
@@ -105,14 +95,11 @@ def get_formats():
 
     except yt_dlp.utils.ExtractorError as e:
         if "Sign in to confirm you’re not a bot" in str(e):
-            return jsonify({"error": "Vídeo protegido: é necessário login no YouTube para descarregar este vídeo."}), 403
+            return jsonify({"error": "Vídeo protegido: é necessário login no YouTube."}), 403
         else:
             return jsonify({"error": str(e)}), 500
-
     except Exception as e:
-        print("Erro geral:", e)
         return jsonify({"error": str(e)}), 500
-
 
 @app.route("/download", methods=["POST"])
 def download():
@@ -150,7 +137,7 @@ def download():
         return send_file(output_path, as_attachment=True)
 
     except Exception as e:
-        return f"Erro: {e}", 500
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
