@@ -1,4 +1,3 @@
-import base64
 import os
 import tempfile
 import uuid
@@ -7,36 +6,7 @@ import yt_dlp
 
 app = Flask(__name__)
 
-# Conteúdo base64 dos cookies - usa exatamente o teu conteúdo.
-COOKIES_BASE64 = """
-IyBOZXRzY2FwZSBIVFRQIENvb2tpZSBGaWxlCiMgVGhpcyBmaWxlIGlzIGdl
-bmVyYXRlZCBieSB5dC1kbHAuICBEbyBub3QgZWRpdC4KCnlvdXR1YmUuY29t
-CVRSVUUJCS8JEEFMU0UJMAlQUkVGCGhsPWVuJnR6PVVUDQp5b3V0dWJlLmNv
-bQlUUlVFCTAJVFJVRQkwCVNPQ1MJQ0FJCi55b3V0dWJlLmNvbQlUUlVFCTAJ
-VFJVRQkwCVlTQwlCcFRud2NRd2l3NAoueW91dHViZS5jb20JVFJVRQkxNzY4
-NDQwNzA4CV9fU2VjdXJlLVJPTExPVVQvVE9LRU4JQ1A3U3F2Ykc2NS1wMXdF
-UXQ3eWtwdVBIaGdNWTdwdlBwdVBIaGdNJTNEDQp5b3V0dWJlLmNvbQlUUlVF
-CTE3Njg0NDU0MjEJVklTSVRPUl9JTkZPMV9MSVZFCWNQdXc5Y2x2ejBjCi55
-b3V0dWJlLmNvbQlUUlVFCTE3Njg0NDU0MjEJVklTSVRPUl9QUklWQUNZX01F
-VEFEQVRBCUNnSlFWQkloRWgwU0d3c01EZzhRRVJJVEZCVVdGeGdaR2hzY0hS
-NGZJQ0VpSXlRbEppQWYNCi55b3V0dWJlLmNvbQlUUlVFCTE4MTU5NjU0MjEJ
-X19TZWN1cmUtWVRfVFZGQVMJdD00ODY5MTMmcj0yCi55b3V0dWJlLmNvbQlU
-UlVFCTE3Njg0NDU0MjEJREVWSUNFX0lORk8JQ2h4T2VsVjVUMFJW
-TlU5VVdUTk9SR013VG1wck5VNUVTVEpPUVQwOUVPMlA3TU1HR0lUcjY4TUcN
-CnllLmNvbQlUUlVFCTE3NTI4OTQ3MzUJR1BTCTEKLnlvdXR1YmUuY29tCVRS
-VUUJL3R2CVRSVUUJMTc4NTcyNTQyMQlfX1NlY3VyZS1ZVF9ERVJQCUNLQ3g1
-SlUt
-"""
-
-# Decodificar e gravar cookies num ficheiro temporário
-def write_cookies_file():
-    decoded = base64.b64decode(COOKIES_BASE64.encode('utf-8'))
-    tf = tempfile.NamedTemporaryFile(delete=False, mode='wb', suffix='.txt')
-    tf.write(decoded)
-    tf.close()
-    return tf.name
-
-COOKIES_FILE = write_cookies_file()
+COOKIES_FILE = "cookies.txt"
 
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -76,11 +46,9 @@ def get_formats():
                     "filesize": f.get("filesize") or 0
                 })
 
-        # Remover duplicados pela label
         unique_formats = {f['label']: f for f in formats}
         formats = list(unique_formats.values())
 
-        # Ordenar por qualidade
         import re
         def sort_key(f):
             label = f['label']
@@ -138,7 +106,6 @@ def download():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
