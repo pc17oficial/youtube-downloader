@@ -1,121 +1,33 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>YouTube Video Downloader</title>
-    <meta name="description" content="Download YouTube videos quickly and easily. Choose your preferred quality and download for free with our YouTube Video Downloader." />
-    <meta name="google-adsense-account" content="ca-pub-3332593525886814" />
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3332593525886814" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <title>Conversor Online de Arquivos</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='adsense.js') }}"></script>
 </head>
 <body>
-    <div class="container">
-        <button id="darkModeToggle" title="Toggle dark mode">🌙</button>
-
-        <h1>YouTube Video Downloader</h1>
-        <p class="subtitle">Download YouTube videos in multiple qualities. Fast, simple, and free!</p>
-
-        <form id="videoForm">
-            <input type="text" id="url" name="url" placeholder="Paste the YouTube video link here" required />
-            <button type="submit">Load Formats</button>
-        </form>
-
-        <div id="formatSection" style="display:none;">
-            <label for="format">Choose quality:</label>
-            <select id="format" name="format_id"></select>
-            <button id="downloadBtn">Download</button>
-        </div>
-
-        <div id="message"></div>
-
-        <h2 class="downloads-count">+1M downloads</h2>
-
-        <!-- Google Adsense Ad -->
-        <ins class="adsbygoogle"
-             style="display:block; margin: 20px 0;"
-             data-ad-client="ca-pub-3332593525886814"
-             data-ad-slot="2801488730"
-             data-ad-format="auto"
-             data-full-width-responsive="true"></ins>
-        <script>
-             (adsbygoogle = window.adsbygoogle || []).push({});
-        </script>
+    <div class="header">
+        <h1>Conversor Online de Arquivos</h1>
+        <p class="subtitle">Converta PDF, Word, Imagens e Vídeos para outros formatos de forma rápida e grátis!</p>
     </div>
-
-    <script>
-        const form = document.getElementById("videoForm");
-        const formatSection = document.getElementById("formatSection");
-        const formatSelect = document.getElementById("format");
-        const downloadBtn = document.getElementById("downloadBtn");
-        const message = document.getElementById("message");
-
-        form.addEventListener("submit", async function (e) {
-            e.preventDefault();
-            message.textContent = "Loading formats...";
-            formatSelect.innerHTML = "";
-            formatSection.style.display = "none";
-
-            const formData = new FormData(form);
-            try {
-                const res = await fetch("/get_formats", {
-                    method: "POST",
-                    body: formData
-                });
-                const data = await res.json();
-                if (data.error) {
-                    message.textContent = "Error: " + data.error;
-                } else {
-                    data.formats.forEach(f => {
-                        const option = document.createElement("option");
-                        option.value = f.format_id;
-                        option.textContent = f.label;
-                        formatSelect.appendChild(option);
-                    });
-                    formatSection.style.display = "block";
-                    message.textContent = "";
-                }
-            } catch (err) {
-                message.textContent = "Error while loading formats.";
-            }
-        });
-
-        downloadBtn.addEventListener("click", async function () {
-            message.textContent = "Preparing download...";
-            const formData = new FormData(form);
-            formData.append("format_id", formatSelect.value);
-            try {
-                const res = await fetch("/download", {
-                    method: "POST",
-                    body: formData
-                });
-
-                if (!res.ok) {
-                    const errorText = await res.text();
-                    message.textContent = "Error: " + errorText;
-                    return;
-                }
-
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = "video.mp4";
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                message.textContent = "Download complete!";
-            } catch (err) {
-                message.textContent = "Error during download.";
-            }
-        });
-
-        // 🌙 Toggle dark mode
-        const toggleBtn = document.getElementById('darkModeToggle');
-        toggleBtn.addEventListener('click', () => {
-            document.body.classList.toggle('dark-mode');
-            toggleBtn.textContent = document.body.classList.contains('dark-mode') ? '☀️' : '🌙';
-        });
-    </script>
+    <div class="container">
+        <form action="{{ url_for('convert') }}" method="get">
+            <button type="submit">Começar Conversão</button>
+        </form>
+        <div class="adsense-container">
+            <!-- Google Adsense Ad -->
+            <ins class="adsbygoogle"
+                 style="display:block; text-align:center;"
+                 data-ad-client="ca-pub-3332593525886814"
+                 data-ad-slot="2801488730"
+                 data-ad-format="auto"
+                 data-full-width-responsive="true"></ins>
+        </div>
+        <p style="text-align:center;margin-top:2rem;font-size:.9rem;color:#666;">
+            Seguro, rápido e sem necessidade de cadastro.
+        </p>
+    </div>
 </body>
 </html>

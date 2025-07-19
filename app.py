@@ -1,111 +1,166 @@
 import os
+import zipfile
 import tempfile
-import uuid
-from flask import Flask, render_template, request, send_file, jsonify, after_this_request
-import yt_dlp
+from flask import Flask, render_template, request, send_file, flash, Response
+from werkzeug.utils import secure_filename
+from pdf2docx import Converter
+from docx import Document
+from PIL import Image
+from moviepy.editor import VideoFileClip
 
 app = Flask(__name__)
+app.secret_key = "supersecretkey"
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png', 'mp4', 'mov', 'avi', 'docx'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-COOKIES_FILE = "cookies.txt"
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-DOWNLOAD_FOLDER = "downloads"
-os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+def convert_file(filepath, conv_type, filename):
+    ext = filename.rsplit('.', 1)[1].lower()
+    base = filename.rsplit('.', 1)[0]
+    result_files = []
+
+    # PDF para DOCX
+    if conv_type == "pdf2word" and ext == "pdf":
+        docx_path = os.path.join(tempfile.gettempdir(), base + ".docx")
+        try:
+            cv = Converter(filepath)
+            cv.convert(docx_path)
+            cv.close()
+            result_files.append(docx_path)
+        except Exception as e:
+            return None, f"Erro ao converter PDF para Word: {str(e)}"
+
+    # DOCX para PDF
+    elif conv_type == "word2pdf" and ext == "docx":
+        pdf_path = os.path.join(tempfile.gettempdir(), base + ".pdf")
+        try:
+            # Usando docx2pdf não funciona em Linux/Render, então converte para imagem PDF
+            doc = Document(filepath)
+            txt = "\n".join([p.text for p in doc.paragraphs])
+            img = Image.new('RGB', (1000, 1400), color='white')
+            from PIL import ImageDraw
+            draw = ImageDraw.Draw(img)
+            draw.text((50, 50), txt, fill='black')
+            img.save(pdf_path, "PDF", resolution=100.0)
+            result_files.append(pdf_path)
+        except Exception as e:
+            return None, f"Erro ao converter Word para PDF: {str(e)}"
+
+    # Imagem para PDF
+    elif conv_type == "img2pdf" and ext in ["jpg", "jpeg", "png"]:
+        pdf_path = os.path.join(tempfile.gettempdir(), base + ".pdf")
+        try:
+            image = Image.open(filepath)
+            image.save(pdf_path, "PDF", resolution=100.0)
+            result_files.append(pdf_path)
+        except Exception as e:
+            return None, f"Erro ao converter Imagem para PDF: {str(e)}"
+
+    # PDF para Imagem PNG
+    elif conv_type == "pdf2img" and ext == "pdf":
+        try:
+            from pdf2image import convert_from_path
+            images = convert_from_path(filepath)
+            img_paths = []
+            for i, img in enumerate(images):
+                img_path = os.path.join(tempfile.gettempdir(), f"{base}_page{i+1}.png")
+                img.save(img_path, "PNG")
+                img_paths.append(img_path)
+            result_files.extend(img_paths)
+        except Exception as e:
+            return None, f"Erro ao converter PDF para Imagem: {str(e)}"
+
+    # PNG para JPG
+    elif conv_type == "png2jpg" and ext == "png":
+        jpg_path = os.path.join(tempfile.gettempdir(), base + ".jpg")
+        try:
+            image = Image.open(filepath)
+            rgb_im = image.convert('RGB')
+            rgb_im.save(jpg_path, "JPEG")
+            result_files.append(jpg_path)
+        except Exception as e:
+            return None, f"Erro ao converter PNG para JPG: {str(e)}"
+
+    # JPG para PNG
+    elif conv_type == "jpg2png" and ext in ["jpg", "jpeg"]:
+        png_path = os.path.join(tempfile.gettempdir(), base + ".png")
+        try:
+            image = Image.open(filepath)
+            image.save(png_path, "PNG")
+            result_files.append(png_path)
+        except Exception as e:
+            return None, f"Erro ao converter JPG para PNG: {str(e)}"
+
+    # Vídeo para MP3
+    elif conv_type == "video2mp3" and ext in ["mp4", "mov", "avi"]:
+        mp3_path = os.path.join(tempfile.gettempdir(), base + ".mp3")
+        try:
+            clip = VideoFileClip(filepath)
+            clip.audio.write_audiofile(mp3_path)
+            clip.close()
+            result_files.append(mp3_path)
+        except Exception as e:
+            return None, f"Erro ao converter Vídeo para MP3: {str(e)}"
+    else:
+        return None, "Tipo de conversão ou arquivo inválido."
+
+    return result_files, None
 
 @app.route("/")
-def index():
+def home():
     return render_template("index.html")
 
-@app.route("/get_formats", methods=["POST"])
-def get_formats():
-    url = request.form.get("url")
-    if not url:
-        return jsonify({"error": "URL em falta."}), 400
-
-    ydl_opts = {
-        "quiet": True,
-        "skip_download": True,
-        "cookiefile": COOKIES_FILE,
-        "nocheckcertificate": True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                      '(KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
-    }
-
-    try:
-        formats = []
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            for f in info.get("formats", []):
-                has_video = f.get("vcodec") != "none"
-                has_audio = f.get("acodec") != "none"
-                tipo = "[Vídeo + Áudio]" if has_video and has_audio else "[Vídeo]" if has_video else "[Áudio]"
-                resolution = f.get("format_note") or (str(f.get("height")) + "p" if f.get("height") else "?")
-                label = f"{tipo} - {resolution}" if has_video else f"{tipo} - {f.get('abr', '?')}kbps"
-                formats.append({
-                    "format_id": f["format_id"],
-                    "label": label,
-                    "filesize": f.get("filesize") or 0
-                })
-
-        unique_formats = {f['label']: f for f in formats}
-        formats = list(unique_formats.values())
-
-        import re
-        def sort_key(f):
-            label = f['label']
-            base = 3 if "[Vídeo + Áudio]" in label else 2 if "[Vídeo]" in label else 1
-            nums = re.findall(r'\d+', label)
-            quality = int(nums[0]) if nums else 0
-            return (base, quality)
-
-        formats.sort(key=sort_key, reverse=True)
-
-        return jsonify({"formats": formats})
-
-    except yt_dlp.utils.ExtractorError as e:
-        if "Sign in to confirm you’re not a bot" in str(e):
-            return jsonify({"error": "Vídeo protegido: é necessário login no YouTube."}), 403
-        else:
-            return jsonify({"error": str(e)}), 500
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/download", methods=["POST"])
-def download():
-    url = request.form.get("url")
-    format_id = request.form.get("format_id")
-
-    if not url or not format_id:
-        return jsonify({"error": "URL ou format_id em falta."}), 400
-
-    video_id = str(uuid.uuid4())
-    output_path = os.path.join(DOWNLOAD_FOLDER, f"{video_id}.mp4")
-
-    ydl_opts = {
-        "quiet": True,
-        "format": format_id,
-        "outtmpl": output_path,
-        "cookiefile": COOKIES_FILE,
-        "nocheckcertificate": True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                      '(KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
-    }
-
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-
-        @after_this_request
-        def remove_file(response):
+@app.route("/convert", methods=["GET", "POST"])
+def convert():
+    if request.method == "POST":
+        files = request.files.getlist("files")
+        conv_type = request.form.get("conv_type")
+        if not files or not conv_type:
+            return Response("Selecione arquivos e tipo de conversão.", status=400)
+        converted_files = []
+        errors = []
+        for file in files:
+            if not allowed_file(file.filename):
+                errors.append(f"Arquivo inválido: {file.filename}")
+                continue
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            result, err = convert_file(filepath, conv_type, filename)
+            if result:
+                converted_files.extend(result)
+            else:
+                errors.append(f"{filename}: {err}")
             try:
-                os.remove(output_path)
-            except Exception as e:
-                print(f"Erro a apagar ficheiro: {e}")
-            return response
+                os.remove(filepath)
+            except Exception:
+                pass
+        if converted_files and not errors:
+            # Se só um arquivo, retorna direto
+            if len(converted_files) == 1:
+                return send_file(converted_files[0], as_attachment=True)
+            # Se múltiplos, faz zip
+            zip_path = os.path.join(tempfile.gettempdir(), "arquivos_convertidos.zip")
+            with zipfile.ZipFile(zip_path, "w") as zipf:
+                for f in converted_files:
+                    zipf.write(f, arcname=os.path.basename(f))
+            for f in converted_files:
+                try:
+                    os.remove(f)
+                except Exception:
+                    pass
+            return send_file(zip_path, as_attachment=True)
+        else:
+            return Response("Erros: " + " | ".join(errors), status=400)
+    return render_template("convert.html")
 
-        return send_file(output_path, as_attachment=True)
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+@app.errorhandler(413)
+def too_large(e):
+    return "Arquivo muito grande!", 413
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

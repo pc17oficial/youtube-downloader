@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Converter Arquivo</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='adsense.js') }}"></script>
+</head>
+<body>
+    <div class="header">
+        <h1>Converter Arquivo</h1>
+        <p class="subtitle">Escolha os arquivos e o tipo de conversão</p>
+    </div>
+    <div class="container">
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="flash">{{ messages[0] }}</div>
+          {% endif %}
+        {% endwith %}
+        <form id="convertForm" action="{{ url_for('convert') }}" method="POST" enctype="multipart/form-data">
+            <input type="file" name="files" multiple required>
+            <select name="conv_type" required>
+                <option value="" disabled selected>Selecione o tipo de conversão</option>
+                <option value="pdf2word">PDF para Word (.docx)</option>
+                <option value="word2pdf">Word (.docx) para PDF</option>
+                <option value="img2pdf">Imagem para PDF</option>
+                <option value="pdf2img">PDF para Imagem (PNG)</option>
+                <option value="png2jpg">PNG para JPG</option>
+                <option value="jpg2png">JPG para PNG</option>
+                <option value="video2mp3">Vídeo para MP3 (áudio)</option>
+            </select>
+            <div class="progress-bar-container" id="progressContainer">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <button type="submit">Converter</button>
+        </form>
+        <div class="adsense-container">
+            <!-- Google Adsense Ad -->
+            <ins class="adsbygoogle"
+                 style="display:block; text-align:center;"
+                 data-ad-client="ca-pub-3332593525886814"
+                 data-ad-slot="2801488730"
+                 data-ad-format="auto"
+                 data-full-width-responsive="true"></ins>
+        </div>
+        <p style="text-align:center;margin-top:2rem;font-size:.9rem;color:#666;">
+            Suporte para PDF, DOCX, JPG, PNG, MP4, MOV, AVI. <br>
+            Pode converter múltiplos arquivos ao mesmo tempo.
+        </p>
+    </div>
+    <script>
+    // Barra de progresso do upload
+    document.getElementById('convertForm').addEventListener('submit', function(e) {
+        var form = e.target;
+        var progressContainer = document.getElementById('progressContainer');
+        var progressBar = document.getElementById('progressBar');
+        e.preventDefault();
+        progressContainer.style.display = 'block';
+        progressBar.style.width = '0';
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", form.action);
+        xhr.upload.onprogress = function(e) {
+            if (e.lengthComputable) {
+                var percent = (e.loaded / e.total) * 100;
+                progressBar.style.width = percent + "%";
+            }
+        }
+        xhr.onload = function() {
+            progressContainer.style.display = 'none';
+            if (xhr.status === 200) {
+                // Se for zip, baixa direto
+                var blob = xhr.response;
+                var disposition = xhr.getResponseHeader('Content-Disposition');
+                var filename = "arquivos_convertidos.zip";
+                if (disposition && disposition.indexOf('filename=') !== -1) {
+                    filename = disposition.split('filename=')[1].replace(/"/g, '');
+                }
+                var a = document.createElement('a');
+                a.href = window.URL.createObjectURL(blob);
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            } else {
+                alert("Erro ao converter: " + xhr.responseText);
+            }
+        }
+        xhr.onerror = function() {
+            progressContainer.style.display = 'none';
+            alert("Erro de conexão.");
+        }
+        var formData = new FormData(form);
+        xhr.responseType = 'blob';
+        xhr.send(formData);
+    });
+    </script>
+</body>
+</html>
