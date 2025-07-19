@@ -17,8 +17,9 @@ def index():
 @app.route("/get_formats", methods=["POST"])
 def get_formats():
     url = request.form["url"]
+    
     print("Caminho do ficheiro cookies:", COOKIES_FILE)
-print("O ficheiro existe?", os.path.exists(COOKIES_FILE))
+    print("O ficheiro existe?", os.path.exists(COOKIES_FILE))
 
     ydl_opts = {
         "quiet": True,
