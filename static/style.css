@@ -1,5 +1,5 @@
 body {
-    font-family: Arial, sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: #f5f5f5;
     color: #333;
     margin: 0;
@@ -9,34 +9,52 @@ body {
 .container {
     max-width: 600px;
     margin: 60px auto;
-    background: #ffffff;
-    padding: 30px;
+    background: #fff;
+    padding: 30px 40px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-    border-radius: 10px;
+    border-radius: 12px;
     position: relative;
+    text-align: center;
 }
 
 h1 {
-    text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 8px;
+    font-weight: 700;
+    font-size: 2.5rem;
+    color: #222;
+}
+
+.subtitle {
+    font-size: 1.1rem;
+    margin-bottom: 25px;
+    color: #555;
 }
 
 form input[type="text"] {
     width: 100%;
-    padding: 12px;
-    margin-bottom: 10px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
+    padding: 14px 15px;
+    font-size: 1rem;
+    margin-bottom: 12px;
+    border: 1.5px solid #ccc;
+    border-radius: 8px;
+    transition: border-color 0.3s ease;
+}
+
+form input[type="text"]:focus {
+    outline: none;
+    border-color: #007bff;
 }
 
 form button, #downloadBtn {
-    padding: 10px 20px;
+    padding: 12px 30px;
+    font-size: 1rem;
     margin-top: 10px;
     background-color: #007bff;
     color: #fff;
     border: none;
-    border-radius: 5px;
+    border-radius: 8px;
     cursor: pointer;
+    transition: background-color 0.3s ease;
 }
 
 form button:hover, #downloadBtn:hover {
@@ -45,26 +63,40 @@ form button:hover, #downloadBtn:hover {
 
 select {
     width: 100%;
-    padding: 12px;
+    padding: 14px 15px;
+    font-size: 1rem;
     margin-top: 10px;
-    border-radius: 5px;
-    border: 1px solid #ccc;
+    border-radius: 8px;
+    border: 1.5px solid #ccc;
+    transition: border-color 0.3s ease;
+}
+
+select:focus {
+    outline: none;
+    border-color: #007bff;
 }
 
 #message {
-    margin-top: 20px;
-    text-align: center;
-    color: red;
+    margin-top: 25px;
+    font-weight: 600;
+    color: #e74c3c; /* vermelho para erros */
 }
 
-/* Botão de alternância de modo escuro */
+.downloads-count {
+    margin-top: 35px;
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: #222;
+}
+
+/* Dark mode button */
 #darkModeToggle {
     position: absolute;
     top: 20px;
     right: 20px;
     background: none;
     border: none;
-    font-size: 24px;
+    font-size: 28px;
     cursor: pointer;
     transition: transform 0.2s;
 }
@@ -72,29 +104,34 @@ select {
     transform: scale(1.2);
 }
 
-/* Modo escuro */
+/* Dark mode styles */
 body.dark-mode {
     background: #121212;
-    color: #f0f0f0;
+    color: #eee;
 }
+
 body.dark-mode .container {
     background: #1e1e1e;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
 }
+
 body.dark-mode input,
 body.dark-mode select {
     background: #2b2b2b;
-    color: #f0f0f0;
-    border: 1px solid #555;
+    color: #eee;
+    border: 1.5px solid #555;
 }
+
 body.dark-mode input:focus,
 body.dark-mode select:focus {
     border-color: #999;
 }
+
 body.dark-mode button {
     background: #333;
     color: #fff;
 }
+
 body.dark-mode #message {
     color: #ff6b6b;
 }
