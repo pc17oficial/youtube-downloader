@@ -1,133 +1,102 @@
 <!DOCTYPE html>
-<html lang="pt">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>YouTube Downloader</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #111;
-            color: #fff;
-            display: flex;
-            height: 100vh;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .container {
-            background: #222;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px #333;
-            text-align: center;
-            width: 100%;
-            max-width: 500px;
-        }
-
-        input, select, button {
-            margin-top: 10px;
-            padding: 10px;
-            font-size: 16px;
-            width: 100%;
-            border-radius: 5px;
-            border: none;
-        }
-
-        button {
-            background: #28a745;
-            color: white;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background: #218838;
-        }
-
-        #status {
-            margin-top: 10px;
-            font-size: 14px;
-        }
-    </style>
+    <title>YouTube Video Downloader</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Download de Vídeos do YouTube</h1>
-        <input type="text" id="url" placeholder="Cola aqui o link do YouTube">
-        <button onclick="obterQualidades()">Ver resoluções</button>
-
-        <select id="formatSelect" style="display:none;"></select>
-        <button onclick="fazerDownload()" id="downloadBtn" style="display:none;">Download</button>
-
-        <div id="status"></div>
+        <button id="darkModeToggle" title="Toggle dark mode">🌙</button>
+        <h1>YouTube Video Downloader</h1>
+        <form id="videoForm">
+            <input type="text" id="url" name="url" placeholder="Paste the YouTube video link here" required>
+            <button type="submit">Load Formats</button>
+        </form>
+        <div id="formatSection" style="display:none;">
+            <label for="format">Choose quality:</label>
+            <select id="format" name="format_id"></select>
+            <button id="downloadBtn">Download</button>
+        </div>
+        <div id="message"></div>
+          <h1 style="text-align: center; margin-top: 20px; color: #333; font-weight: bold;">
+    +1M downloads
+  </h1>
     </div>
 
     <script>
-        function obterQualidades() {
-            const url = document.getElementById("url").value.trim();
-            const status = document.getElementById("status");
-            const select = document.getElementById("formatSelect");
-            const downloadBtn = document.getElementById("downloadBtn");
+        const form = document.getElementById("videoForm");
+        const formatSection = document.getElementById("formatSection");
+        const formatSelect = document.getElementById("format");
+        const downloadBtn = document.getElementById("downloadBtn");
+        const message = document.getElementById("message");
 
-            if (!url) {
-                status.innerText = "Insere um link primeiro.";
-                return;
-            }
+        form.addEventListener("submit", async function (e) {
+            e.preventDefault();
+            message.textContent = "Loading formats...";
+            formatSelect.innerHTML = "";
+            formatSection.style.display = "none";
 
-            status.innerText = "A carregar resoluções...";
-            fetch("/get_formats", {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: "url=" + encodeURIComponent(url)
-            })
-            .then(res => res.json())
-            .then(data => {
+            const formData = new FormData(form);
+            try {
+                const res = await fetch("/get_formats", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
                 if (data.error) {
-                    status.innerText = "Erro: " + data.error;
+                    message.textContent = "Error: " + data.error;
+                } else {
+                    data.formats.forEach(f => {
+                        const option = document.createElement("option");
+                        option.value = f.format_id;
+                        option.textContent = f.label;
+                        formatSelect.appendChild(option);
+                    });
+                    formatSection.style.display = "block";
+                    message.textContent = "";
+                }
+            } catch (err) {
+                message.textContent = "Error while loading formats.";
+            }
+        });
+
+        downloadBtn.addEventListener("click", async function () {
+            message.textContent = "Preparing download...";
+            const formData = new FormData(form);
+            formData.append("format_id", formatSelect.value);
+            try {
+                const res = await fetch("/download", {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    message.textContent = "Error: " + errorText;
                     return;
                 }
 
-                select.innerHTML = "";
-                data.formats.forEach(format => {
-                    const option = document.createElement("option");
-                    option.value = format.format_id;
-                    option.text = format.label;
-                    select.appendChild(option);
-                });
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "video.mp4";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                message.textContent = "Download complete!";
+            } catch (err) {
+                message.textContent = "Error during download.";
+            }
+        });
 
-                select.style.display = "inline";
-                downloadBtn.style.display = "inline";
-                status.innerText = "";
-            })
-            .catch(err => {
-                status.innerText = "Erro ao carregar resoluções.";
-                console.error(err);
-            });
-        }
-
-        function fazerDownload() {
-            const url = document.getElementById("url").value.trim();
-            const format_id = document.getElementById("formatSelect").value;
-
-            const form = document.createElement("form");
-            form.method = "POST";
-            form.action = "/download";
-
-            const input1 = document.createElement("input");
-            input1.type = "hidden";
-            input1.name = "url";
-            input1.value = url;
-
-            const input2 = document.createElement("input");
-            input2.type = "hidden";
-            input2.name = "format_id";
-            input2.value = format_id;
-
-            form.appendChild(input1);
-            form.appendChild(input2);
-            document.body.appendChild(form);
-            form.submit();
-        }
+        // 🌙 Toggle dark mode
+        const toggleBtn = document.getElementById('darkModeToggle');
+        toggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            toggleBtn.textContent = document.body.classList.contains('dark-mode') ? '☀️' : '🌙';
+        });
     </script>
 </body>
 </html>
