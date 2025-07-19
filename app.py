@@ -7,7 +7,7 @@ import tempfile
 
 app = Flask(__name__)
 
-# Base64 dos cookies.txt (codificado manualmente)
+# Base64 dos cookies.txt (mantém exatamente como tens, sem alterações)
 COOKIES_BASE64 = """
 IyBOZXRzY2FwZSBIVFRQIENvb2tpZSBGaWxlDQojIFRoaXMgZmlsZSBpcyBnZW5l
 cmF0ZWQgYnkgeXQtZGxwLiAgRG8gbm90IGVkaXQuDQoNCi55b3V0dWJlLmNvbQlU
@@ -28,8 +28,8 @@ ZS5jb20JVFJVRQkvdHYJVFJVRQkxNzg1NzI1NDIxCV9fU2VjdXJlLVlUX0RFUlAJ
 Q0tDeDVKVS0NCg==
 """
 
-# Decodifica e escreve os cookies para um ficheiro temporário
-cookies_bytes = base64.b64decode(COOKIES_BASE64)
+# Decodifica e escreve os cookies para um ficheiro temporário (só uma vez no arranque)
+cookies_bytes = base64.b64decode(COOKIES_BASE64.encode('utf-8'))
 temp_cookies_file = tempfile.NamedTemporaryFile(delete=False, mode='wb', suffix='.txt')
 temp_cookies_file.write(cookies_bytes)
 temp_cookies_file.close()
@@ -49,7 +49,8 @@ def get_formats():
     ydl_opts = {
         "quiet": True,
         "skip_download": True,
-        "cookiefile": COOKIES_FILE
+        "cookiefile": COOKIES_FILE,
+        "nocheckcertificate": True,  # Ajuda a evitar problemas SSL
     }
 
     try:
@@ -106,7 +107,8 @@ def download():
         "quiet": True,
         "format": format_id,
         "outtmpl": output_path,
-        "cookiefile": COOKIES_FILE
+        "cookiefile": COOKIES_FILE,
+        "nocheckcertificate": True,
     }
 
     try:
