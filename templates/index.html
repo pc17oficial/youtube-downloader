@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>YouTube Downloader</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #111;
+            color: #fff;
+            display: flex;
+            height: 100vh;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: #222;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px #333;
+            text-align: center;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        input, select, button {
+            margin-top: 10px;
+            padding: 10px;
+            font-size: 16px;
+            width: 100%;
+            border-radius: 5px;
+            border: none;
+        }
+
+        button {
+            background: #28a745;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #218838;
+        }
+
+        #status {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Download de Vídeos do YouTube</h1>
+        <input type="text" id="url" placeholder="Cola aqui o link do YouTube">
+        <button onclick="obterQualidades()">Ver resoluções</button>
+
+        <select id="formatSelect" style="display:none;"></select>
+        <button onclick="fazerDownload()" id="downloadBtn" style="display:none;">Download</button>
+
+        <div id="status"></div>
+    </div>
+
+    <script>
+        function obterQualidades() {
+            const url = document.getElementById("url").value.trim();
+            const status = document.getElementById("status");
+            const select = document.getElementById("formatSelect");
+            const downloadBtn = document.getElementById("downloadBtn");
+
+            if (!url) {
+                status.innerText = "Insere um link primeiro.";
+                return;
+            }
+
+            status.innerText = "A carregar resoluções...";
+            fetch("/get_formats", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: "url=" + encodeURIComponent(url)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    status.innerText = "Erro: " + data.error;
+                    return;
+                }
+
+                select.innerHTML = "";
+                data.formats.forEach(format => {
+                    const option = document.createElement("option");
+                    option.value = format.format_id;
+                    option.text = format.label;
+                    select.appendChild(option);
+                });
+
+                select.style.display = "inline";
+                downloadBtn.style.display = "inline";
+                status.innerText = "";
+            })
+            .catch(err => {
+                status.innerText = "Erro ao carregar resoluções.";
+                console.error(err);
+            });
+        }
+
+        function fazerDownload() {
+            const url = document.getElementById("url").value.trim();
+            const format_id = document.getElementById("formatSelect").value;
+
+            const form = document.createElement("form");
+            form.method = "POST";
+            form.action = "/download";
+
+            const input1 = document.createElement("input");
+            input1.type = "hidden";
+            input1.name = "url";
+            input1.value = url;
+
+            const input2 = document.createElement("input");
+            input2.type = "hidden";
+            input2.name = "format_id";
+            input2.value = format_id;
+
+            form.appendChild(input1);
+            form.appendChild(input2);
+            document.body.appendChild(form);
+            form.submit();
+        }
+    </script>
+</body>
+</html>
